@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WebRTC App - Stefano Collina</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+
+</head>
+
+<body>
+
+  <!-- Contenuto principale (video, lavagna, ecc.) -->
+  <div id="content">
+    <div id="header">
+      <h1 id="page-title">WebRTC APP Stefano Collina</h1>
+      <h2 id="nome-stanza" class="dis"></h2>
+      <h2 id="nome-ruolo" class="dis"></h2>
+
+      <div id="stanza-container">
+        <input type="text" id="nomeStanza" placeholder="Nome stanza">
+        <button class="pill partecipa" id="btn-crea-partecipa">
+          <span class="icon">👥</span>
+          Entra nella stanza
+        </button>
+      </div>
+    </div>
+    
+    <!-- Qui continua il resto della pagina, sotto il banner -->
+  </div>
+
+
+  <!-- Aggiunto contenitore principale -->
+  <div id="main-container">
+    <!-- Contenuto principale -->
+    <div id="content">
+
+
+   
+
+
+
+      <!-- Sezione Video -->
+      <div id="video-section">
+        <div id="local-video-container">
+          <h3>Video locale</h3>
+          <video id="local-video" autoplay muted playsinline></video>
+          <div class="video-buttons">
+            <button class="pill" id="btn-start-call" disabled>
+              <span class="icon">
+                <img src="./images/inizio_chiamata.png" alt="Inizia Chiamata">
+              </span>
+              <span class="label">Chiama</span>
+            </button>
+            <button class="pill" id="btn-share-screen" disabled>
+              <span class="icon">
+                <img src="./images/condivisione_schermo.png" alt="Condivisione schermo">
+              </span>
+              <span class="label">Condividi schermo</span>
+            </button>
+            <button class="pill" id="btn-toggle-mic" disabled>
+              <span class="icon">
+                <img src="./images/microfono_mutato.png" alt="Muta microfono">
+              </span>
+              <span class="label">Muta microfono</span>
+            </button>
+            <button class="pill"  id="btn-toggle-cam" disabled>
+              <span class="icon">
+                <img src="./images/webcam_mutata.png" alt="nascondi webcam">
+              </span>
+              <span class="label">Nascondi webcam</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="video-buttons-vertical">
+          <button class="pill" id="btn-stats" disabled>
+            <span class="icon">
+                <img src="./images/statistiche.png" alt="stats">
+            </span>
+            <span class="label">Mostra statistiche</span>
+          </button>
+          <button class="pill" id="btn-turnOn">
+            <span class="icon">
+                <img src="./images/consenso.png" alt="consenso">
+            </span>
+            Consenti Audio e Video
+          </button>
+          <button class="pill" id="btn-change-resolution" disabled>
+            <span class="icon">
+                <img src="./images/risoluzione.png" alt="consenso">
+            </span>
+            Cambia risoluzione
+          </button>
+          <!-- Tendina nascosta inizialmente -->
+          <div id="resolution-dropdown" class="dropdown hidden">
+            <div class="preset-options">
+              <button class="preset" data-quality="low"> Bassa qualità</button>
+              <button class="preset" data-quality="medium"> Media qualità</button>
+              <button class="preset" data-quality="high"> Alta qualità</button>
+            </div>
+
+            <hr>
+
+            <button id="btn-advanced-settings" class="advanced-toggle">⚙️ Impostazioni avanzate</button>
+
+            <!-- Pannello avanzato nascosto -->
+            <div id="advanced-settings" class="advanced hidden">
+              <label>
+                Bitrate video (kbps):
+                <input type="number" id="video-bitrate" min="50" max="5000" step="50" value="1000">
+              </label>
+              <label>
+                Framerate (fps):
+                <input type="number" id="video-framerate" min="5" max="60" step="1" value="30">
+              </label>
+              <label>
+                Riduzione risoluzione:
+                <input type="number" id="scale-down" min="1" max="4" step="0.5" value="1">
+              </label>
+              <label>
+                Bitrate audio (kbps):
+                <input type="number" id="audio-bitrate" min="16" max="256" step="16" value="64">
+              </label>
+
+              <button id="apply-custom-quality" class="apply"> Applica</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="remote-video-container">
+          <h3>Video remoto</h3>
+          <video id="remote-video" autoplay playsinline></video>
+        </div>
+
+        <!-- Chat laterale -->
+        <div id="chat-container">
+          <button id="chat-toggle-btn">Chat</button>
+          <div id="chat-sidebar">
+            <div id="chat-messages"></div>
+            <div id="chat-input-container">
+              <input type="text" id="chat-input" placeholder="Scrivi un messaggio...">
+              <button id="chat-send-btn">Invia</button>
+            </div>
+          </div>
+        </div>
+    </div>
+   
+      <!-- Sezione Lavagna -->
+
+    <div id="lavagna-container" style="display: flex; height: 90vh; width: 100%;">   
+      <h3 id="whiteboard-title">Lavagna condivisa</h3>
+      <!-- Canvas principale -->
+      <canvas id="whiteboard-canvas" width="1200" height="800" style="border:1px solid #000; flex-grow:1;"></canvas>
+
+      <!-- Barra strumenti a destra -->
+      <div id="toolbox" style="display:flex; flex-direction: column; margin-left: 10px;">
+          <div>
+            <label>Dimensione pennello:</label>
+            <input type="range" id="brush-size" min="1" max="20" value="2">
+            <span id="brush-size-label">2</span>
+          </div>
+          <button id="pen-btn">Pennello</button>
+          <button id="eraser-btn">Gomma</button>
+          <button class="color-btn" data-color="#000000" style="background:#000; width:40px; height:40px; margin-bottom:5px;"></button>
+          <button class="color-btn" data-color="#FF0000" style="background:#f00; width:40px; height:40px; margin-bottom:5px;"></button>
+          <button class="color-btn" data-color="#00FF00" style="background:#0f0; width:40px; height:40px; margin-bottom:5px;"></button>
+          <button class="color-btn" data-color="#0000FF" style="background:#00f; width:40px; height:40px; margin-bottom:5px;"></button>
+          <button class="color-btn" data-color="#FFFF00" style="background:#ff0; width:40px; height:40px; margin-bottom:5px;"></button>
+          <button class="color-btn" data-color="#FFA500" style="background:orange; width:40px; height:40px; margin-bottom:5px;"></button>
+          <button id="clear-btn" style="margin-top:10px;">Cancella</button>
+          <div id="file-container">
+            <label for="image-upload" class="custom-file-upload">
+              📁 Carica un'immagine
+            </label>
+            <input type="file" id="image-upload" accept="image/*" />
+          </div>
+      </div>
+    </div>
+
+   <div id="all-stats-container" class="dis">
+    <div id="stats-container">
+      <h3 id="title-graph">Statistiche video</h3>
+      <canvas id="bitrateChart" width="1200" height="600"></canvas>
+    </div>
+
+    <div class="choose-stats">
+      <button class="graph" data-stat="bitrate">BITRATE</button>
+      <button class="graph" data-stat="datarate">DATA RATE</button>
+      <button class="graph" data-stat="fps">FPS</button>
+      <button class="graph" data-stat="bandwidth">BANDWIDTH</button>
+    </div>
+  </div>
+
+
+
+
+
+  <!-- QUIZ MULTI DOMANDE -->
+  <div id="quiz-wrapper" style="display:flex; gap:20px; margin-top:20px;" class="dis">
+
+    <!-- CREAZIONE QUIZ -->
+    <div id="quiz-container" class="dis">
+      <h3>Quiz Vero/Falso</h3>
+
+      <div id="questions-area" class="dis">
+
+        <!-- TEMPLATE della domanda iniziale -->
+        <div id="question-block" class="question-block dis">
+          <h4 id="question-title" class="question-title dis">Domanda 1</h4>
+
+          <input id="question-text" type="text" class="question-text dis" placeholder="Scrivi la domanda..." style="width:100%;">
+
+          <div id="question-answer" class="question-answer dis">
+            <label><input type="radio" name="answer-1" value="true"> Vero</label>
+            <label><input type="radio" name="answer-1" value="false"> Falso</label>
+          </div>
+
+          <hr>
+        </div>
+
+      </div>
+
+      <button id="add-question-btn" style="margin-top:10px;" class="dis">Aggiungi domanda</button>
+      <br><br>
+      <button id="send-quiz-btn" class="dis">Invia quiz</button>
+
+      
+      <div id="quiz-result" class="dis">
+        <p id="quiz-result-text" class="dis"></p>
+      </div>
+    </div>
+
+    <!-- SIDEBAR RIEPILOGO -->
+    <div id="quiz-preview" style="border:1px solid #ddd; padding:15px; width:300px;" class="dis">
+      <h3>Riepilogo quiz</h3>
+      <ul id="preview-list" style="list-style:none; padding:0;" class="dis"></ul>
+    </div>
+    <!-- CONTENITORE QUIZ RICEVUTO -->
+    <div id="quiz-received" style="display:none" >
+      <h3>Quiz ricevuto</h3>
+      <p id="quiz-text"></p>
+      <div id="quiz-answer-buttons"></div>
+      </div>
+    </div>
+  </div>
+
+    
+
+
+
+
+
+
+
+  <script type="module" src="script.js"></script>
+  <script type="module" src="richiesta_audioVideo.js"></script>
+  <script type="module" src="quiz.js"></script>
+
+</body>
+</html>
