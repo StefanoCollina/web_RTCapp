@@ -1,4 +1,4 @@
-import { connessione } from "./connessione.js";
+import { boardChannel, chatChannel, quizChannel, connessione } from "./connessione.js";
 
 // Variabile per lo stream locale (webcam + audio)
 let localStream;
@@ -17,7 +17,7 @@ let lastTimestamp = 0;
 export async function startLocalVideo() {
   try {
     localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-    currentStream = localStream; // inizialmente è la webcam
+    currentStream = localStream; 
     document.getElementById("local-video").srcObject = localStream;
     return localStream;
   } catch (err) {
@@ -98,36 +98,35 @@ export function stopScreenShare() {
 }
 
 
-// Cambia dinamicamente la qualità audio/video (bitrate, framerate, risoluzione, ecc.)
+// Cambia dinamicamente la qualità audio/video
 export async function setQuality({ 
-  bitrateVideo,        // in bit per secondo (es: 500_000)
-  framerate,           // in fps
-  riduzioneRisoluzione, // fattore di riduzione (es: 1 = piena risoluzione, 2 = metà)
-  bitrateAudio         // in bit per secondo (es: 64_000)
+  bitrateVideo, // in bit per secondo 
+  framerate, // in fps
+  riduzioneRisoluzione, // fattore di riduzione
+  bitrateAudio // in bit per secondo
 }) {
   // Prendiamo i sender video e audio dalla connessione
   const senderVideo = connessione.getSenders().find(s => s.track && s.track.kind === "video");
   const senderAudio = connessione.getSenders().find(s => s.track && s.track.kind === "audio");
 
-  // === VIDEO ===
+  // VIDEO
   if (senderVideo) {
     const params = senderVideo.getParameters();
     if (!params.encodings) params.encodings = [{}];
-    const encoding = params.encodings[0];
+    const encoding = params.encodings[0]; // in encoding sono contenute le informazioni varie: bitrate, fps ecc..
 
     if (bitrateVideo !== undefined) encoding.maxBitrate = bitrateVideo;
     if (framerate !== undefined) encoding.maxFramerate = framerate;
     if (riduzioneRisoluzione !== undefined) encoding.scaleResolutionDownBy = riduzioneRisoluzione;
 
     try {
-      await senderVideo.setParameters(params);
-      console.log("📹 Parametri video aggiornati:", encoding);
+      await senderVideo.setParameters(params); // setta i parametri appena cambiati
     } catch (err) {
       console.error("Errore nell’impostare i parametri video:", err);
     }
   }
 
-  // === AUDIO ===
+  // AUDIO
   if (senderAudio) {
     const params = senderAudio.getParameters();
     if (!params.encodings) params.encodings = [{}];
@@ -137,15 +136,11 @@ export async function setQuality({
 
     try {
       await senderAudio.setParameters(params);
-      console.log("🎤 Parametri audio aggiornati:", encoding);
     } catch (err) {
       console.error("Errore nell’impostare i parametri audio:", err);
     }
   }
 }
-
-
-
 
 
 let selectedStat = "bitrate"; // default
@@ -154,6 +149,7 @@ let selectedStat = "bitrate"; // default
 document.querySelectorAll(".choose-stats .graph").forEach(btn => {
   btn.addEventListener("click", () => {
     selectedStat = btn.dataset.stat;
+    console.log(selectedStat)
     document.getElementById("title-graph").textContent = btn.textContent;
     // reset del grafico quando cambia statistica
     if (bitrateChart) {
@@ -163,13 +159,6 @@ document.querySelectorAll(".choose-stats .graph").forEach(btn => {
     }
   });
 });
-
-
-
-
-
-
-
 
 
 export async function mostraStatistiche() {
@@ -196,10 +185,9 @@ export async function mostraStatistiche() {
             tension: 0.3,
             fill: true
           }
-          // Nota: dataset della banda non viene creato qui, lo aggiungeremo dinamicamente solo se necessario
         ]
       },
-      options: {
+      options: { // per adattare il grafico alle dimensioni della finestra
         responsive: true,
         scales: {
           x: { title: { display: true, text: "Tempo (s)" } },
@@ -217,30 +205,58 @@ export async function mostraStatistiche() {
   let estimatedBandwidth = 0; // in kbps
   stats.forEach(r => {
     if (r.type === "candidate-pair" && r.state === "succeeded" && r.availableOutgoingBitrate) {
-      estimatedBandwidth = Math.round(r.availableOutgoingBitrate / 1000);
+      estimatedBandwidth = Math.round(r.availableOutgoingBitrate / 1000); // converto da bit al secondo a kbit al secondo
     }
   });
 
-  //  OTTIENI STATISTICHE OUTBOUND RTP
+  // --- RTT
+  let rttValue = 0;
+  stats.forEach(r => {
+    if (r.type === "candidate-pair" && r.state === "succeeded" && r.currentRoundTripTime) {
+      rttValue = Math.round(r.currentRoundTripTime * 1000); // ms
+    }
+  });
+
+  // --- BUFFERED AMOUNT (DataChannel)
+  let bufferedAmountValue = 0;
+  if (boardChannel && chatChannel && quizChannel) {
+    bufferedAmountValue = boardChannel.bufferedAmount + chatChannel.bufferedAmount + quizChannel.bufferedAmount || 0;
+  }
+
+
+  //  OTTIENI STATISTICHE OUTBOUND RTP (dati in uscita)
   stats.forEach(report => {
-    if (report.type === "outbound-rtp" && report.kind === "video") {
+    if (report.type === "outbound-rtp" && report.kind === "video" ) {
       if (lastTimestamp && report.timestamp !== lastTimestamp) {
 
         const deltaBytes = report.bytesSent - lastBytesSent;
         const deltaTime = (report.timestamp - lastTimestamp) / 1000; // sec
-        const usedBandwidth = deltaTime > 0 ? Math.round((deltaBytes * 8) / deltaTime / 1000) : 0; // kbps
+        const bitrate = deltaTime > 0 ? Math.round((deltaBytes * 8) / deltaTime / 1000) : 0; // kbps
+        // controllo se deltaTime != 0
+        const dataRate = calcolaDatarate(stats);
 
         let value;
         switch (selectedStat) {
           case "bitrate":
+            value = bitrate;
+            break;
           case "datarate":
-            value = usedBandwidth;
+            value = dataRate;
             break;
           case "fps":
             value = report.framesPerSecond || 0;
             break;
           case "bandwidth":
-            value = usedBandwidth;
+            value = bitrate;
+            break;
+          case "packetloss":
+            value = packetLossPercent;
+            break;
+          case "bufferedamount":
+            value = bufferedAmountValue; // bytes in coda
+            break;
+          case "rtt":
+            value = rttValue; // ms
             break;
           default:
             value = 0;
@@ -250,33 +266,41 @@ export async function mostraStatistiche() {
         bitrateChart.data.labels.push(timeLabel);
 
         if (selectedStat === "bandwidth") {
-          // Se il dataset della banda non esiste ancora, aggiungilo
-          if (bitrateChart.data.datasets.length === 1) {
-            bitrateChart.data.datasets.push({
-              label: "BANDA DISPONIBILE",
-              data: [],
-              borderColor: "#ff0000",
-              borderDash: [5, 5],
-              fill: false
-            });
-          }
+            // crea le due rige extra per la banda
+            if (bitrateChart.data.datasets.length === 1) {
+                bitrateChart.data.datasets.push({
+                    label: "BANDA DISPONIBILE",
+                    data: [],
+                    borderColor: "#ff0000",
+                    borderDash: [5, 5],
+                    fill: false
+                });
+                bitrateChart.data.datasets.push({
+                    label: "DATARATE",
+                    data: [],
+                    borderColor: "#00cc00",
+                    fill: false
+                });
+            }
 
-          // Aggiorna i dataset
-          bitrateChart.data.datasets[0].label = "BANDA USATA";
-          bitrateChart.data.datasets[0].data.push(usedBandwidth);
+            // Aggiorna i dataset
+            bitrateChart.data.datasets[0].label = "BANDA USATA";
+            bitrateChart.data.datasets[0].data.push(bitrate);   // video
 
-          bitrateChart.data.datasets[1].data.push(estimatedBandwidth);
+            bitrateChart.data.datasets[1].data.push(estimatedBandwidth); // banda max
 
+            bitrateChart.data.datasets[2].data.push(dataRate); // datarate totale
         } else {
-          // Rimuovi il dataset della banda se esiste
-          if (bitrateChart.data.datasets.length > 1) {
-            bitrateChart.data.datasets.splice(1, 1);
-          }
+            // Rimuovi eventuali dataset extra se non serve la banda
+            if (bitrateChart.data.datasets.length > 1) {
+                bitrateChart.data.datasets.splice(1, bitrateChart.data.datasets.length - 1);
+            }
 
-          // Aggiorna il dataset principale
-          bitrateChart.data.datasets[0].label = selectedStat.toUpperCase();
-          bitrateChart.data.datasets[0].data.push(value);
+            // Aggiorna il dataset principale
+            bitrateChart.data.datasets[0].label = selectedStat.toUpperCase();
+            bitrateChart.data.datasets[0].data.push(value);
         }
+
 
         // Limita a 20 punti
         if (bitrateChart.data.labels.length > 20) {
@@ -285,7 +309,7 @@ export async function mostraStatistiche() {
         }
 
         // Aggiorna titolo asse Y
-        bitrateChart.options.scales.y.title.text = selectedStat === "bandwidth" ? "BANDA (kbps)" : selectedStat.toUpperCase();
+        bitrateChart.options.scales.y.title.text = selectedStat === "bandwidth" ? "BANDA / DATARATE (kbps)" : selectedStat.toUpperCase();
         bitrateChart.update();
       }
 
@@ -296,4 +320,41 @@ export async function mostraStatistiche() {
   });
 
   setTimeout(mostraStatistiche, 1000);
+}
+
+// Oggetto globale per memorizzare i precedenti byte inviati per ogni id
+const lastStats = {}; 
+
+function calcolaDatarate(stats) {
+    let totalBytes = 0;
+    const now = Date.now();
+
+    stats.forEach(report => {
+        // Considera solo outbound
+        if ((report.type === "outbound-rtp" && (report.kind === "video" || report.kind === "audio")) 
+            || report.type === "data-channel") {
+            
+            const id = report.id || report.ssrc || report.label || Math.random(); // identificatore unico
+            const last = lastStats[id] || { bytesSent: 0, timestamp: now };
+            
+            const deltaBytes = (report.bytesSent || 0) - last.bytesSent;
+            const deltaTime = ((report.timestamp || now) - last.timestamp) / 1000; // secondi
+            
+            if (deltaTime > 0) {
+                totalBytes += deltaBytes;
+            }
+
+            // Salva per prossimo calcolo
+            lastStats[id] = {
+                bytesSent: report.bytesSent || 0,
+                timestamp: report.timestamp || now
+            };
+        }
+    });
+
+    // Converti da bytes/sec a kbps
+    const datarateKbps = Math.round((totalBytes) * 8 / 1000);
+
+
+    return datarateKbps ;
 }
