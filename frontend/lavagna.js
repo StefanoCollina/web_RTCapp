@@ -9,22 +9,19 @@ let linee = []; // linee locali + remote
 let bufferInvio = []; // buffer per messaggi inviati prima che il canale sia aperto
 const immaginiInDownload = {}; // buffer per ricezione immagini in chunk
 
-// --- Variabili per ridimensionamento immagini ---
+// ridimensionamento
 let selectedImage = null;
 let resizeStart = null;
 let resizing = false;
 const HANDLE_SIZE = 10; // dimensione dei maniglioni agli angoli
 
-// --- Setup DataChannel ---
+// Setup DataChannel 
 export function setupBoardChannel(channel) {
     boardChannel = channel;
-    console.log("📡 Setup boardChannel, stato iniziale:", boardChannel.readyState);
-
     boardChannel.onopen = () => {
-        console.log("✅ Lavagna pronta, stato:", boardChannel.readyState);
 
-        while (bufferInvio.length) {
-            const msg = bufferInvio.shift();
+        while (bufferInvio.length) { // finchè non esiste almeno un elemento nel buffer (finchè la coda non è vuota)
+            const msg = bufferInvio.shift(); // rimuove il primo elemento --> msg è quello da inviare
             boardChannel.send(JSON.stringify(msg));
         }
     };
@@ -34,8 +31,9 @@ export function setupBoardChannel(channel) {
     };
 }
 
-// --- Invio aggiornamento ---
-function inviaUpdateLavagna(dati) {
+// Invio aggiornamento
+function inviaUpdateLavagna(dati) { // se esiste ed è pronto il canale invii, sennò metti nel buffer
+    
     if (boardChannel?.readyState === "open") {
         boardChannel.send(JSON.stringify(dati));
     } else {
@@ -43,47 +41,47 @@ function inviaUpdateLavagna(dati) {
     }
 }
 
-// --- Canvas setup ---
+// Canvas setup
 const canvas = document.getElementById("whiteboard-canvas");
-const ctx = canvas.getContext("2d");
+const ctx = canvas.getContext("2d"); // oggetto con cui fare tutte le operazioni di disegno
 ctx.lineWidth = 2;
 ctx.strokeStyle = currentColor;
 
-// --- Mouse events ---
+// Mouse events
 function getMousePos(evt) {
-    const rect = canvas.getBoundingClientRect();
+    const rect = canvas.getBoundingClientRect(); // ottiene posizione e dimensioni del canvas
     return {
-        x: (evt.clientX - rect.left) * (canvas.width / rect.width),
+        x: (evt.clientX - rect.left) * (canvas.width / rect.width), // distanza dal bordo sx * rapporto di scala
         y: (evt.clientY - rect.top) * (canvas.height / rect.height),
     };
 }
 
-canvas.addEventListener("mousedown", (e) => {
+canvas.addEventListener("mousedown", (e) => { // quando viene premuto tasto sx sul canvas
     const pos = getMousePos(e);
 
     // controlla se clicco su un maniglione per ridimensionare
-    for (let i = immagini.length - 1; i >= 0; i--) {
+    for (let i = immagini.length - 1; i >= 0; i--) { // scorre le immagini presenti sul canvas
         const img = immagini[i];
         const handle = { x: img.x + img.width, y: img.y + img.height }; // angolo in basso a destra
-        if (
+        if ( // controllo che il mouse si trovi nel quadrato per ridimensionare
             pos.x >= handle.x - HANDLE_SIZE && pos.x <= handle.x + HANDLE_SIZE &&
             pos.y >= handle.y - HANDLE_SIZE && pos.y <= handle.y + HANDLE_SIZE
         ) {
-            selectedImage = img;
+            selectedImage = img; // salvi immagine da ridimensionare
             resizing = true;
             resizeStart = pos;
             return;
         }
     }
 
-    // se non sto ridimensionando, controllo per selezione immagine (spostamento)
+    // se non sto ridimensionando, controllo per spostamento
     for (let i = immagini.length - 1; i >= 0; i--) {
         const img = immagini[i];
-        if (
+        if ( // controllo se clicco su immagine
             pos.x >= img.x && pos.x <= img.x + img.width &&
             pos.y >= img.y && pos.y <= img.y + img.height
         ) {
-            selectedImage = img;
+            selectedImage = img; // salvi immagine da spostare
             resizing = false; // spostamento normale
             resizeStart = pos;
             return;
@@ -100,11 +98,11 @@ canvas.addEventListener("mousemove", (e) => {
 
     if (selectedImage && resizeStart) {
         if (resizing) {
-            // ridimensionamento proporzionale
+            // calcolo di quanto si è spostato il mouse
             const dx = pos.x - resizeStart.x;
             const dy = pos.y - resizeStart.y;
 
-            const scale = Math.min(
+            const scale = Math.min( // prende il minore per non modificare le proporzioni
                 (selectedImage.width + dx) / selectedImage.width,
                 (selectedImage.height + dy) / selectedImage.height
             );
@@ -132,33 +130,34 @@ canvas.addEventListener("mousemove", (e) => {
         type: "line",
         from: lastPos,
         to: pos,
-        color: eraserActive ? "#FFFFFF" : currentColor,
+        color: eraserActive ? "#FFFFFF" : currentColor, // se è attiva la gomma il colore è bianco, altrimenti è current color
         width: ctx.lineWidth,
     };
 
-    ctx.save();
+    ctx.save(); // salva il contesto del canvas
     if (eraserActive) {
-        ctx.globalCompositeOperation = "destination-out";
+        ctx.globalCompositeOperation = "destination-out"; // cancellare i pixel sotto al tratto disegnato
         ctx.strokeStyle = "rgba(0,0,0,1)";
     } else {
-        ctx.globalCompositeOperation = "source-over";
+        ctx.globalCompositeOperation = "source-over"; // disegna sopra
         ctx.strokeStyle = segmento.color;
     }
-    ctx.lineWidth = segmento.width;
-    ctx.beginPath();
-    ctx.moveTo(lastPos.x, lastPos.y);
-    ctx.lineTo(pos.x, pos.y);
-    ctx.stroke();
-    ctx.restore();
+    ctx.lineWidth = segmento.width;// spessore linea
+    ctx.beginPath(); // nuovo percorso
+    ctx.moveTo(lastPos.x, lastPos.y);// punto iniziale
+    ctx.lineTo(pos.x, pos.y);// punto finale
+    ctx.stroke();// disegna linea
+    ctx.restore();// ripristina stato
 
-    linee.push(segmento);
+    linee.push(segmento);// salva segmento
     inviaUpdateLavagna(segmento);
     lastPos = pos;
+
 });
 
 canvas.addEventListener("mouseup", () => {
     if (selectedImage) {
-        inviaUpdateLavagna({
+        inviaUpdateLavagna({ // invia aggiornaamenti su dimensione e posizione 
             type: "updateImage",
             id: selectedImage.id,
             x: selectedImage.x,
@@ -174,7 +173,7 @@ canvas.addEventListener("mouseup", () => {
     resizing = false;
 });
 
-canvas.addEventListener("mouseout", () => {
+canvas.addEventListener("mouseout", () => { // ferma disegno se esce dal canvas
     drawing = false;
     lastPos = null;
     selectedImage = null;
@@ -182,11 +181,11 @@ canvas.addEventListener("mouseout", () => {
     resizing = false;
 });
 
-// --- Ricezione ---
+// Ricezione
 export function riceviUpdateLavagna(dati) {
     let obj;
     try {
-        obj = typeof dati === "string" ? JSON.parse(dati) : dati;
+        obj = typeof dati === "string" ? JSON.parse(dati) : dati; // se dati è stringa --> oggetto json
     } catch (err) {
         console.error("Errore parsing lavagna:", err, dati);
         return;
@@ -200,7 +199,7 @@ export function riceviUpdateLavagna(dati) {
         immagini = [];
         ctx.clearRect(0, 0, canvas.width, canvas.height);
     } 
-    // --- Ricezione immagini chunk ---
+    // Ricezione immagini chunk
     else if (obj.type === "imgChunk") {
         if (!immaginiInDownload[obj.id]) immaginiInDownload[obj.id] = { chunks: [] };
         immaginiInDownload[obj.id].chunks.push(obj.data);
@@ -223,7 +222,7 @@ export function riceviUpdateLavagna(dati) {
         };
         image.src = joined;
     }
-    // --- Aggiornamento immagine ridimensionata/spostata ---
+    // Aggiornamento immagine ridimensionata/spostata
     else if (obj.type === "updateImage") {
         const img = immagini.find(i => i.id === obj.id);
         if (img) {
@@ -236,7 +235,7 @@ export function riceviUpdateLavagna(dati) {
     }
 }
 
-// --- Pulsanti colore e clear ---
+// Pulsanti colore e clear
 export function setupColorButtons() {
     document.querySelectorAll(".color-btn").forEach((btn) => {
         btn.addEventListener("click", () => {
@@ -255,7 +254,7 @@ export function setupColorButtons() {
     }
 }
 
-// --- Upload immagini ---
+// Upload immagini
 export function setupImageUpload() {
     const input = document.getElementById("image-upload");
     if (!input) return;
@@ -265,22 +264,22 @@ export function setupImageUpload() {
         if (!file) return;
 
         const reader = new FileReader();
-        reader.onload = () => {
+        reader.onload = () => { // quando immagine è letta
             const img = new Image();
             const MAX_WIDTH = canvas.width - 20 ;   
             const MAX_HEIGHT = canvas.height - 20;
 
-            img.onload = () => {
+            img.onload = () => { // quando immagine è caricata
                 let width = img.width;
                 let height = img.height;
 
-                // scala proporzionalmente senza ingrandire immagini piccole
+                // scala proporzionalmente senza ingrandire (al massimo vengono rimpicciolite)
                 const scale = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height, 1);
                 width = width * scale;
                 height = height * scale;
 
                 const imgObj = {
-                    id: crypto.randomUUID(),
+                    id: crypto.randomUUID(), // id univoco
                     image: img,
                     x: 10,
                     y: 10,
@@ -296,16 +295,16 @@ export function setupImageUpload() {
 
             img.src = reader.result;
         };
-        reader.readAsDataURL(file);
+        reader.readAsDataURL(file); // legge file e converte in stringa base64 --> scatena evento onload del reader
     });
 }
 
-// --- Invio immagine in chunk ---
+//  Invio immagine in chunk
 function inviaImmagineInChunk(imgObj) {
-    const chunkSize = 16000;
-    const src = imgObj.src;
-    for (let i = 0; i < src.length; i += chunkSize) {
-        const chunk = src.slice(i, i + chunkSize);
+    const chunkSize = 16000; // byte di dimensione
+    const src = imgObj.src; // dati immagine in base64
+    for (let i = 0; i < src.length; i += chunkSize) { 
+        const chunk = src.slice(i, i + chunkSize); // estrae pezzo grande massimo 16 KB
         inviaUpdateLavagna({ type: "imgChunk", id: imgObj.id, data: chunk });
     }
     inviaUpdateLavagna({
@@ -316,13 +315,15 @@ function inviaImmagineInChunk(imgObj) {
         width: imgObj.width,
         height: imgObj.height,
     });
+    const input = document.getElementById("image-upload");
+    input.value = ""; // reset input --> per permettere invio di più immagini uguale
 }
 
-// --- Ridisegna tutto ---
+// Ridisegna tutto
 function drawBoard() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 1️⃣ immagini
+    // immagini
     for (const img of immagini) {
         ctx.drawImage(img.image, img.x, img.y, img.width, img.height);
 
@@ -333,7 +334,7 @@ function drawBoard() {
         }
     }
 
-    // 2️⃣ linee sopra immagini
+    // linee sopra immagini
     for (const seg of linee) {
         ctx.save();
         if (seg.color === "#FFFFFF") {
@@ -352,7 +353,7 @@ function drawBoard() {
     }
 }
 
-// --- Brush size ---
+// Brush size
 export function setupBrushSize() {
     const brushSizeInput = document.getElementById("brush-size");
     const brushSizeLabel = document.getElementById("brush-size-label");
@@ -365,7 +366,7 @@ export function setupBrushSize() {
     });
 }
 
-// --- Eraser buttons ---
+// Eraser buttons
 export function setupEraserButtons() {
     const eraserBtn = document.getElementById("eraser-btn");
     const penBtn = document.getElementById("pen-btn");
@@ -381,4 +382,68 @@ export function setupEraserButtons() {
             eraserActive = false;
         });
     }
+}
+
+
+
+// Array di immagini demo (puoi sostituire src con URL reali o base64)
+const immaginiDemo = [
+    { dim: "100", src: "./images/immagine_100KB.png", width: 100, height: 100 },
+    { dim: "200", src: "./images/immagine_200KB.jpg", width: 200, height: 200 },
+    { dim: "400", src: "./images/immagine_400KB.png", width: 300, height: 300 }
+];
+
+export async function caricaImm(grandezza) {
+
+    // trova immagine demo corrispondente
+    const demo = immaginiDemo.find(img => img.dim === grandezza);
+    if (!demo) {
+        console.error("Immagine demo non trovata:", grandezza);
+        return;
+    }
+
+    const img = new Image();
+
+    img.onload = () => {
+
+        const MAX_WIDTH = canvas.width - 20;
+        const MAX_HEIGHT = canvas.height - 20;
+
+        let width = img.width;
+        let height = img.height;
+
+
+        // scala proporzionalmente se necessario
+        const scale = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height, 1);
+        width *= scale;
+        height *= scale;
+
+        const imgObj = {
+            id: crypto.randomUUID(),
+            image: img,
+            x: 10,
+            y: 10,
+            width,
+            height,
+            src: demo.src, // sarà convertito sotto
+        };
+
+        // Aggiungi a lavagna
+        immagini.push(imgObj);
+        drawBoard();
+
+        // Converti in base64 e invia in chunk
+        const reader = new FileReader();
+        reader.onload = () => {
+            imgObj.src = reader.result; // salva il base64
+            inviaImmagineInChunk(imgObj);
+        };
+
+        // carica il file come base64 tramite fetch + blob
+        fetch(demo.src)
+            .then(res => res.blob())
+            .then(blob => reader.readAsDataURL(blob));
+    };
+
+    img.src = demo.src;
 }
