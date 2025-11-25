@@ -2,6 +2,7 @@ import { startCall, ready } from './connessione.js';
 import { startLocalVideo, startScreenShare, stopScreenShare, setQuality, mostraStatistiche } from './richiesta_audioVideo.js';
 import { attivaDisattivaMic, attivaDisattivaCam, terminaChiamata, disabilitaBottone } from './bottoni.js';
 import { inviaMessaggio } from "./chat.js";
+import { caricaImm } from "./lavagna.js";
 
 const invioChiamata = document.getElementById("btn-start-call");
 const turnOn = document.getElementById("btn-turnOn");
@@ -12,29 +13,24 @@ const chatSidebar = document.getElementById('chat-sidebar');
 const mic = document.getElementById('btn-toggle-mic');
 const cam = document.getElementById('btn-toggle-cam');
 
-// Pulsante e tendina qualità video
 const btnChange = document.getElementById("btn-change-resolution");
 const dropdown = document.getElementById("resolution-dropdown");
 const btnAdvanced = document.getElementById("btn-advanced-settings");
 const advancedPanel = document.getElementById("advanced-settings");
 
-
 const muteMic = document.getElementById("btn-toggle-mic");
 const muteCam = document.getElementById("btn-toggle-cam");
 
-
 export let localS;
-let socket;
 let share = false;
 
-// Utility per riattivare un bottone
 function abilita(btn) {
   btn.disabled = false;
 }
 
-// === SCREEN SHARE ===
+/* Screen share */
 ShareScreen.addEventListener('click', async () => {
-  if (!share) { // se non stai condividendo
+  if (!share) {
     localS = await startScreenShare();
     share = true;
     ShareScreen.classList.toggle('shared');
@@ -45,12 +41,12 @@ ShareScreen.addEventListener('click', async () => {
   }
 });
 
-// === CHAT ===
+/* Chat toggle */
 toggleChatBtn.addEventListener('click', () => {
   chatSidebar.classList.toggle('open');
 });
 
-// === AVVIA VIDEO ===
+/* Start local video */
 turnOn.addEventListener("click", async () => {
   localS = await startLocalVideo();
   disabilitaBottone(turnOn);
@@ -65,16 +61,16 @@ turnOn.addEventListener("click", async () => {
   }
 });
 
-// === CREA / PARTECIPA ===
+/* Create/Join room */
 creaPartecipa.addEventListener("click", async () => {
-  socket = await ready();
+  let socket = await ready();
   disabilitaBottone(creaPartecipa);
   document.getElementById("nome-stanza").classList.remove("dis");
-  
+
   if (turnOn.classList.contains("hidden")) abilita(invioChiamata);
 });
 
-// === AVVIA / TERMINA CHIAMATA ===
+/* Start/End call */
 invioChiamata.addEventListener("click", async () => {
   if (!invioChiamata.classList.contains("termina") && !invioChiamata.classList.contains("wait")) {
     await startCall();
@@ -83,14 +79,14 @@ invioChiamata.addEventListener("click", async () => {
   }
 });
 
-// === MICROFONO E CAMERA ===
+/* Toggle mic/cam */
 mic.addEventListener("click", async () => attivaDisattivaMic(localS));
 cam.addEventListener("click", async () => attivaDisattivaCam(localS));
 
-// === CHAT INVIO MESSAGGIO ===
+/* Chat send */
 document.getElementById("chat-send-btn").addEventListener("click", async () => inviaMessaggio());
 
-// === STRUMENTO DISEGNO ===
+/* Brush size tool */
 export function setupBrushSize() {
   const brushSizeInput = document.getElementById("brush-size");
   const brushSizeLabel = document.getElementById("brush-size-label");
@@ -102,43 +98,42 @@ export function setupBrushSize() {
   });
 }
 
-// === MENU CAMBIO RISOLUZIONE ===
-
-// Apri/chiudi la tendina
+/* Resolution dropdown */
 btnChange.addEventListener("click", () => {
   dropdown.classList.toggle("hidden");
-  advancedPanel.classList.add("hidden"); // chiudi il pannello avanzato se aperto
+  advancedPanel.classList.add("hidden");
 });
 
-// Apri/chiudi impostazioni avanzate
+/* Advanced settings toggle */
 btnAdvanced.addEventListener("click", () => {
   advancedPanel.classList.toggle("hidden");
 });
 
-// Click sui preset di qualità
+/* Preset quality options */
 document.querySelectorAll(".preset").forEach(btn => {
   btn.addEventListener("click", () => {
     const quality = btn.dataset.quality;
+
     if (quality === "low") {
       setQuality({
-        bitrateVideo: 200_000,       // 200 kbps
+        bitrateVideo: 200000, //200 kbps
         framerate: 15,
         riduzioneRisoluzione: 2,
-        bitrateAudio: 32_000
+        bitrateAudio: 32000
       });
     } else if (quality === "medium") {
       setQuality({
-        bitrateVideo: 700_000,       // 700 kbps
+        bitrateVideo: 700000,
         framerate: 24,
         riduzioneRisoluzione: 1.5,
-        bitrateAudio: 64_000
+        bitrateAudio: 64000
       });
     } else if (quality === "high") {
       setQuality({
-        bitrateVideo: 1_500_000,     // 1.5 Mbps
+        bitrateVideo: 1500000,
         framerate: 30,
         riduzioneRisoluzione: 1,
-        bitrateAudio: 128_000
+        bitrateAudio: 128000
       });
     }
 
@@ -146,7 +141,7 @@ document.querySelectorAll(".preset").forEach(btn => {
   });
 });
 
-// Applica impostazioni manuali
+/* Apply custom quality */
 document.getElementById("apply-custom-quality").addEventListener("click", () => {
   const bitrateVideo = Number(document.getElementById("video-bitrate").value) * 1000;
   const framerate = Number(document.getElementById("video-framerate").value);
@@ -157,10 +152,48 @@ document.getElementById("apply-custom-quality").addEventListener("click", () => 
   dropdown.classList.add("hidden");
 });
 
-
-
+/* Statistics */
 document.getElementById("btn-stats").addEventListener("click", () => {
-
   mostraStatistiche();
-})
+});
 
+
+let simulationInterval = null;
+
+document.getElementById("start-simulation").addEventListener("click", () => {
+    // Legge il radio selezionato per frequenza
+    const freqRadio = document.querySelector('input[name="freq"]:checked');
+    // Legge il radio selezionato per grandezza immagine
+    const sizeRadio = document.querySelector('input[name="size"]:checked');
+
+    // Controlla se entrambi sono selezionati
+    if (!freqRadio || !sizeRadio) {
+        alert("Seleziona sia la frequenza che la grandezza dell'immagine prima di iniziare la simulazione!");
+        return; // esce dalla funzione, non fare nulla
+    }
+    document.getElementById("start-simulation").disabled = true;
+    document.getElementById("end-simulation").disabled = false;
+
+    const frequenza = freqRadio.value;
+    const grandezza = sizeRadio.value;
+
+    simulationInterval = setInterval(() => {
+        caricaImm(grandezza);
+    }, 1000/frequenza);
+
+
+
+
+});
+
+document.getElementById("end-simulation").addEventListener("click", () => {
+    if (simulationInterval) {
+        clearInterval(simulationInterval);
+        simulationInterval = null;
+    }
+
+    document.getElementById("start-simulation").disabled = false;
+    document.getElementById("end-simulation").disabled = true;
+  
+
+})
