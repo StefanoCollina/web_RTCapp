@@ -180,7 +180,60 @@
       </div>
     </div>
 
+
+    
+
    <div id="all-stats-container" class="dis">
+
+    <div id="test-container" style="font-family: sans-serif; max-width: 400px;">
+
+        <h3>Seleziona quante immagini inviare al secondo</h3>
+        <div class="freq-buttons">
+            <label class="radio-option">
+                <input type="radio" name="freq" value="1">
+                1 immagine
+            </label>
+
+            <label class="radio-option">
+                <input type="radio" name="freq" value="5">
+                5 immagini
+            </label>
+
+            <label class="radio-option">
+                <input type="radio" name="freq" value="10">
+                10 immagini
+            </label>
+        </div>
+
+        <h3>Seleziona la grandezza dell'immagine</h3>
+        <div class="option-buttons">
+            <label class="radio-option">
+                <input type="radio" name="size" value="100">
+                100 KB
+            </label>
+
+            <label class="radio-option">
+                <input type="radio" name="size" value="200">
+                200 KB
+            </label>
+
+            <label class="radio-option">
+                <input type="radio" name="size" value="400">
+                400 KB
+            </label>
+        </div>
+
+        <br>
+
+        <button id="start-simulation" style="padding: 10px 15px; font-size: 16px; font-weight: bold;">
+            Inizia simulazione
+        </button>
+        <button id="end-simulation" style="padding: 10px 15px; font-size: 16px; font-weight: bold;" disabled>
+            Ferma simulazione
+        </button>
+    </div>
+
+
     <div id="stats-container">
       <h3 id="title-graph">Statistiche video</h3>
       <canvas id="bitrateChart" width="1200" height="600"></canvas>
@@ -191,6 +244,8 @@
       <button class="graph" data-stat="datarate">DATA RATE</button>
       <button class="graph" data-stat="fps">FPS</button>
       <button class="graph" data-stat="bandwidth">BANDWIDTH</button>
+      <button class="graph" data-stat="bufferedamount">BUFFEREDAMOUNT</button>
+      <button class="graph" data-stat="rtt">RTT</button>
     </div>
   </div>
 
