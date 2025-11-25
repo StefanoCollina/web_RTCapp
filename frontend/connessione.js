@@ -6,6 +6,11 @@ import { setupBoardChannel, setupColorButtons, setupImageUpload, setupBrushSize,
 
 export const connessione = new RTCPeerConnection();
 export let socket;
+export let chatChannel;
+export let boardChannel;
+export let quizChannel;
+
+let stanza;
 
 const invioChiamata = document.getElementById("btn-start-call");
 const remoteVideo = document.getElementById("remote-video");
@@ -19,18 +24,8 @@ const muteCam = document.getElementById("btn-toggle-cam");
 const viewStat = document.getElementById("btn-stats");
 const res = document.getElementById("btn-change-resolution");
 
-
-
-
-let stanza;
-
-export let chatChannel;
-export let boardChannel;
-export let quizChannel;
-
-
-// ----------------- Gestione video remoto -----------------
-connessione.ontrack = event => {
+// Remote video
+connessione.ontrack = event => { //quando riceve dal peer una traccia media
   invioChiamata.disabled = false;
   const icon = invioChiamata.querySelector(".icon img");
   const label = invioChiamata.querySelector(".label");
@@ -38,45 +33,32 @@ connessione.ontrack = event => {
   icon.src = "./images/fine_chiamata.png";
   label.textContent = "Termina Chiamata";
 
-
-
-  if (remoteVideo.srcObject !== event.streams[0]) {
+  if (remoteVideo.srcObject !== event.streams[0]) { //se lo stream che arriva è diverso da quello precedente
     remoteVideo.srcObject = event.streams[0];
   }
 };
 
-// ----------------- ICE Candidates -----------------
-connessione.onicecandidate = event => {
-  if (event.candidate) sendToPeer("candidate", event.candidate);
-};
-
-// ----------------- Creazione DataChannel -----------------
+// DataChannel: chat
 function creaDataChannel() {
   chatChannel = connessione.createDataChannel("chat");
-  chatChannel.onopen = () => console.log("Canale chat aperto");
-  chatChannel.onmessage = (event) => riceviMessaggio(event.data);
+  chatChannel.onmessage = (event) => riceviMessaggio(event.data); // associata la callback riceviMessaggio alla ricezione messaggio
   return chatChannel;
 }
 
+// DataChannel: lavagna
 function creaBoardChannel() {
   boardChannel = connessione.createDataChannel("lavagna");
   return boardChannel;
 }
 
+// DataChannel: quiz
 function creaQuizChannel() {
   quizChannel = connessione.createDataChannel("quiz");
-
-  // Callback subito disponibile
-  quizChannel.onopen = () => console.log("Canale quiz aperto (professore)");
-  quizChannel.onmessage = (e) => {
-      console.log("Messaggio quiz ricevuto raw:", e.data);
-      handleQuizMessage(JSON.parse(e.data));
-  };
-
+  quizChannel.onmessage = (e) => handleQuizMessage(JSON.parse(e.data)); // associata la callback handleQuizMessage alla ricezione messaggio
   return quizChannel;
 }
 
-// ----------------- Connessione al server -----------------
+// Connessione server
 export async function ready() {
   stanza = nomeStanzaInput.value.trim();
   if (!stanza) {
@@ -87,7 +69,7 @@ export async function ready() {
   btnStanza.classList.add("hidden");
   nomeStanzaInput.classList.add("hidden");
 
-  socket = new WebSocket(location.origin.replace(/^http/, "ws"));
+  socket = new WebSocket(location.origin.replace(/^http/, "ws")); // ogni client apre websocket con server --> per signaling
 
   socket.onopen = () => {
     socket.send(JSON.stringify({ type: "join", stanza }));
@@ -96,16 +78,14 @@ export async function ready() {
 
   socket.onmessage = async (event) => {
     const message = JSON.parse(event.data);
-    handleMessage(message);
+    handleMessage(message); // associata la callback handleMessage alla ricezione messaggio dalla socket
   };
 
   return socket;
 }
 
-// ----------------- Start call -----------------
+// Start call
 export async function startCall() {
-
-
   if (!localS) return;
 
   shareScreen.disabled = false;
@@ -113,42 +93,38 @@ export async function startCall() {
   muteMic.disabled = false;
   viewStat.disabled = false;
   res.disabled = false;
+  invioChiamata.disabled = false;
 
-  localS.getTracks().forEach(track => connessione.addTrack(track, localS));
+  localS.getTracks().forEach(track => connessione.addTrack(track, localS)); // aggiungo le tracce locali alla connessione 
 
-  // Creazione DataChannel
   chatChannel  = creaDataChannel();
   boardChannel = creaBoardChannel();
-  quizChannel = creaQuizChannel()
+  quizChannel  = creaQuizChannel();
 
-  // configurazione
   setupBoardChannel(boardChannel); 
   setupColorButtons();
   setupImageUpload();
   setupBrushSize();
-  setupEraserButtons()
+  setupEraserButtons();
 
-  invioChiamata.disabled = false;
-  invioChiamata.classList.remove("wait");
   const icon = invioChiamata.querySelector(".icon img");
   const label = invioChiamata.querySelector(".label");
   invioChiamata.classList.add("termina");
   icon.src = "./images/fine_chiamata.png";
   label.textContent = "Termina Chiamata";
 
-  const offer = await connessione.createOffer();
-  await connessione.setLocalDescription(offer);
+  const offer = await connessione.createOffer(); //creazione offerta contentente informazioni per la connessione
+  await connessione.setLocalDescription(offer); //settaggio delle informazioni locali
   sendToPeer("offer", offer);
 }
 
+// Quiz message handler
 function handleQuizMessage(msg) {
   switch(msg.type) {
     case "quiz-send":
-      console.log("quiz send ricevuto");
-      window.dispatchEvent(new CustomEvent("quiz_received", { detail: msg.quiz }));
+      window.dispatchEvent(new CustomEvent("quiz_received", { detail: msg.quiz })); // creo un evento globale quiz_received
       break;
     case "quiz-answer":
-      console.log("quiz answer ricevuto");
       window.dispatchEvent(new CustomEvent("quiz_answer", { detail: msg.answer }));
       break;
     default:
@@ -156,153 +132,134 @@ function handleQuizMessage(msg) {
   }
 }
 
-
-// ----------------- Gestione messaggi -----------------
+// Gestione messaggi WebSocket
 export async function handleMessage(message) {
-  if (message.type === "offer") {
-    if (localS) localS.getTracks().forEach(track => connessione.addTrack(track, localS));
-    else console.warn("Nessun localStream disponibile nel peer remoto!");
+  if (message.type === "offer") { // peer remoto che riceve chiamata
+
+    if (localS) localS.getTracks().forEach(track => connessione.addTrack(track, localS)); // aggiunge le sue tracce alla connessione
 
     shareScreen.disabled = false;
     viewStat.disabled = false;
     res.disabled = false;
 
-    connessione.ondatachannel = (event) => {
-      if(event.channel.label === "lavagna") {
+    connessione.ondatachannel = (event) => { // setup dei vari canali
+      if (event.channel.label === "lavagna") {
         boardChannel = event.channel;
         boardChannel.onopen = () => {
           setupBoardChannel(boardChannel);
           setupColorButtons();
           setupImageUpload();
           setupBrushSize();
-          setupEraserButtons()
+          setupEraserButtons();
         };
-        
       }
-      if(event.channel.label === "chat") {
+
+      if (event.channel.label === "chat") {
         chatChannel = event.channel;
         chatChannel.onmessage = (e) => riceviMessaggio(e.data);
       }
+
       if (event.channel.label === "quiz") {
         quizChannel = event.channel;
         quizChannel.onopen = () => console.log("Canale quiz aperto (remote)");
         quizChannel.onmessage = (e) => {
-            console.log("Messaggio quiz ricevuto raw:", e.data);
-            handleQuizMessage(JSON.parse(e.data));
-        };      
+          handleQuizMessage(JSON.parse(e.data));
+        };
       }
     };
 
-    await connessione.setRemoteDescription(message.data);
-    const answer = await connessione.createAnswer();
-    await connessione.setLocalDescription(answer);
+    await connessione.setRemoteDescription(message.data); // settaggio delle informazioni remote
+    const answer = await connessione.createAnswer(); // creazione risposta con le informazioni locali
+    await connessione.setLocalDescription(answer); // settagio info locali
     sendToPeer("answer", answer);
 
-  } else if (message.type === "answer") {
-    console.log("ricevuta l'answer");
-    await connessione.setRemoteDescription(message.data);
+  } else if (message.type === "answer") { // peer locale che chiama
+    await connessione.setRemoteDescription(message.data); // settaggio info remote 
 
-  } else if (message.type === "candidate") {
-    await connessione.addIceCandidate(message.data);
+  } else if (message.type === "candidate") { 
+    await connessione.addIceCandidate(message.data); // aggiunta di un possibile ICE candidate
 
   } else if (message.type === "termina") {
     alert("L’altro peer ha chiuso la chiamata");
     stop();
-  } else if (message.type === "joined") {
+
+  } else if (message.type === "joined") { // appena entri nella stanza ricevi un ruolo: PROFESSORE o ALUNNO
     const { ruolo } = message;
-    // Salvo in una variabile globale o in un modulo condiviso
     window.myRole = ruolo;
 
-    if(window.myRole === "professore"){
+    if (window.myRole === "professore") {
       setUpProfessore();
-    }else if(window.myRole === "alunno"){
+    } else if (window.myRole === "alunno") {
       setUpAlunno();
     }
 
-    //rendo visibile il ruolo
     document.getElementById("nome-ruolo").classList.remove("dis");
     document.getElementById("nome-ruolo").textContent = "Ruolo attuale: " + myRole;
-  } else if (message.type === "error"){
-    alert("Stanza già piena!");
 
+  } else if (message.type === "error") {
+    alert("Stanza già piena!");
     resetApp();
-  } 
-  
+  }
 }
 
-// ----------------- Invio messaggi al peer -----------------
+// ICE candidates
+connessione.onicecandidate = event => { // si attiva ogni volta che viene trovato un candidate
+  if (event.candidate) sendToPeer("candidate", event.candidate);
+};
+
+// Invia messaggi al peer
 function sendToPeer(type, data) {
   socket.send(JSON.stringify({ type, data }));
 }
 
-// ----------------- Stop chiamata -----------------
+// Stop chiamata
 export function stop() {
-  if (localS) localS.getTracks().forEach(track => track.stop());
+  if (localS) localS.getTracks().forEach(track => track.stop()); // termina tutte le tracce media locali
 
-  localVideo.srcObject = null;
+  localVideo.srcObject = null; // rimuove lo stream locale dall'elemento video
   remoteVideo.srcObject = null;
 
   if (connessione) {
-    try { connessione.close(); console.log("Connessione chiusa correttamente"); }
+    try { connessione.close(); } // chiudi la RTCPeerConnection
     catch (err) { console.error("Errore durante close():", err); }
   }
 
-  if (socket) { socket.close(); socket = null; }
+  if (socket) { socket.close(); socket = null; } // chiudi websocket con server
 
   resetApp();
-  console.log("Chiamata terminata");
 }
 
-
-/*--------------quiz----------------*/
-
-
+// Quiz: invio quiz
 export function sendQuizToPeer(quizData) {
-  if (quizChannel?.readyState === "open") {
+  if (quizChannel?.readyState === "open") { // condizione vera se il canale c'è ed è pronto
     quizChannel.send(JSON.stringify({
       type: "quiz-send",
       quiz: quizData
     }));
-    console.log("Quiz inviato:", quizData);
   } else {
-    console.warn("QuizChannel non aperto, ritento tra 100ms");
-    setTimeout(() => sendQuizToPeer(quizData), 100);
+    setTimeout(() => sendQuizToPeer(quizData), 100); // riprova a mandare il quiz dopo 100ms
   }
 }
 
-export function sendQuizAnswerToPeer(answerObj) {
-  if (!quizChannel) {
-    console.error("quizChannel non disponibile!");
-    return;
-  }
+// Quiz: invio risposta
+export function sendQuizAnswerToPeer(answerObj) { // mandi la risposta da alunno a professore
+  if (!quizChannel) return;
 
   const sendMsg = () => {
     quizChannel.send(JSON.stringify({
       type: "quiz-answer",
       answer: answerObj
     }));
-    console.log("Messaggio quiz-answer inviato:", answerObj);
   };
 
   if (quizChannel.readyState === "open") {
     sendMsg();
   } else {
-    console.log("quizChannel non aperto, attendo apertura...");
     quizChannel.onopen = sendMsg;
   }
 }
 
-
-/*----------------Set Up iniziale-----------------*/
-
-
-
-
-
-
-
-
-
+// UI elementi quiz
 const wrapper = document.getElementById("quiz-wrapper");
 const question_area = document.getElementById("questions-area");
 const quiz_cont = document.getElementById("quiz-container");
@@ -317,8 +274,8 @@ const result_text = document.getElementById("quiz-result-text");
 const prev = document.getElementById("quiz-preview");
 const prev_list = document.getElementById("preview-list");
 
-
-function setUpProfessore(){
+// Set up UI professore
+function setUpProfessore() {
   wrapper.classList.remove("dis");
   question_area.classList.remove("dis");
   quiz_cont.classList.remove("dis");
@@ -334,6 +291,5 @@ function setUpProfessore(){
   ans.classList.remove("dis");
 }
 
-function setUpAlunno(){
-
-}
+// Set up UI alunno
+function setUpAlunno() { }
