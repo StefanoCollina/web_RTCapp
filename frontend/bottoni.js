@@ -87,9 +87,6 @@ export function terminaChiamata() {
   remoteVideo.srcObject = null;
 
 
-  console.log(socket);
-  console.log(typeof socket);
-
   // Invia messaggio all’altro peer
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({ type: "termina" }));
@@ -99,7 +96,6 @@ export function terminaChiamata() {
   if (connessione) {
     try {
       connessione.close();
-      console.log("Connessione chiusa correttamente");
     } catch (err) {
       console.error("Errore durante close():", err);
     }
@@ -116,7 +112,6 @@ export function terminaChiamata() {
   // Reset app
   resetApp();
 
-  console.log("Chiamata terminata");
 }
 
 /**
