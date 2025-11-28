@@ -394,7 +394,7 @@ const immaginiDemo = [
 ];
 
 export async function caricaImm(grandezza) {
-
+    console.log("spedita");
     // trova immagine demo corrispondente
     const demo = immaginiDemo.find(img => img.dim === grandezza);
     if (!demo) {
@@ -447,5 +447,6 @@ export async function caricaImm(grandezza) {
 
     img.src = demo.src;
 }
+
 
 
