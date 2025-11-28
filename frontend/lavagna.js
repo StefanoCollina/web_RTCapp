@@ -388,9 +388,9 @@ export function setupEraserButtons() {
 
 // Array di immagini demo (puoi sostituire src con URL reali o base64)
 const immaginiDemo = [
-    { dim: "100", src: "./images/immagine_100KB.png", width: 100, height: 100 },
-    { dim: "200", src: "./images/immagine_200KB.jpg", width: 200, height: 200 },
-    { dim: "400", src: "./images/immagine_400KB.png", width: 300, height: 300 }
+    { dim: "100", src: "./web_RTCapp/images/immagine_100KB.png", width: 100, height: 100 },
+    { dim: "200", src: "./web_RTCapp/images/immagine_200KB.jpg", width: 200, height: 200 },
+    { dim: "400", src: "./web_RTCapp/images/immagine_400KB.png", width: 300, height: 300 }
 ];
 
 export async function caricaImm(grandezza) {
@@ -447,3 +447,4 @@ export async function caricaImm(grandezza) {
 
     img.src = demo.src;
 }
+
